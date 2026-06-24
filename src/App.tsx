@@ -13,7 +13,7 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const check = () => setIsAdmin(window.location.pathname.endsWith('/admin'));
+    const check = () => setIsAdmin(new URLSearchParams(window.location.search).has('admin'));
     check();
     window.addEventListener('popstate', check);
     return () => window.removeEventListener('popstate', check);

@@ -81,9 +81,17 @@ export default function Footer() {
                 </a>
               </div>
             </div>
-            <p className="text-slate-400 text-center md:text-right">
-              Copyright © {currentYear} KAM Auto Shop. All rights reserved.
-            </p>
+            <div className="flex items-center gap-4">
+              <p className="text-slate-400 text-center md:text-right">
+                Copyright © {currentYear} KAM Auto Shop. All rights reserved.
+              </p>
+              <a
+                href="?admin"
+                className="text-slate-700 hover:text-slate-500 text-xs transition-colors"
+              >
+                Admin
+              </a>
+            </div>
           </div>
         </div>
       </div>
