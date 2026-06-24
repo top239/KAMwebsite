@@ -26,7 +26,9 @@ export default function Footer() {
                 <MapPin className="w-5 h-5 flex-shrink-0 mt-0.5 text-orange-500" />
                 <span>
                   4603 Bank St, Unit 6<br />
-                  Gloucester, ON K1T 3W6
+                  Gloucester, ON K1T 3W6<br />
+                  <span className="text-slate-500 text-sm">Professional Car & Truck Services in Ottawa</span><br />
+                  <span className="text-slate-500 text-sm">Reliable engine diagnostics and repair for cars and light trucks</span>
                 </span>
               </div>
             </div>
