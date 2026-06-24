@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import {
-  LogOut, Plus, Trash2, Car, Loader2, CheckCircle, AlertCircle, X, Eye, EyeOff, Upload, Link
+  LogOut, Plus, Trash2, Car, Loader2, CheckCircle, AlertCircle, X, Eye, EyeOff, Upload, Link, Pencil
 } from 'lucide-react';
 
 interface CarListing {
@@ -21,7 +21,21 @@ interface CarListing {
   created_at: string;
 }
 
-const emptyForm = {
+type FormData = {
+  make: string;
+  model: string;
+  year: number;
+  price: string;
+  mileage: string;
+  color: string;
+  transmission: string;
+  fuel_type: string;
+  description: string;
+  image_url: string;
+  status: 'available' | 'sold';
+};
+
+const emptyForm: FormData = {
   make: '',
   model: '',
   year: new Date().getFullYear(),
@@ -32,8 +46,24 @@ const emptyForm = {
   fuel_type: 'Gasoline',
   description: '',
   image_url: '',
-  status: 'available' as const,
+  status: 'available',
 };
+
+function carToForm(car: CarListing): FormData {
+  return {
+    make: car.make,
+    model: car.model,
+    year: car.year,
+    price: String(car.price),
+    mileage: String(car.mileage),
+    color: car.color,
+    transmission: car.transmission,
+    fuel_type: car.fuel_type,
+    description: car.description ?? '',
+    image_url: car.image_url ?? '',
+    status: car.status,
+  };
+}
 
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
   useEffect(() => {
@@ -140,7 +170,8 @@ export default function AdminPanel() {
   const [cars, setCars] = useState<CarListing[]>([]);
   const [carsLoading, setCarsLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormData>(emptyForm);
   const [formLoading, setFormLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -175,7 +206,36 @@ export default function AdminPanel() {
     setCarsLoading(false);
   }
 
-  async function handleAddCar(e: FormEvent) {
+  function openAdd() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setImageMode('upload');
+    setUploadFile(null);
+    setUploadPreview(null);
+    setShowForm(true);
+  }
+
+  function openEdit(car: CarListing) {
+    setEditingId(car.id);
+    setForm(carToForm(car));
+    setUploadFile(null);
+    setUploadPreview(null);
+    if (car.image_url) {
+      setImageMode('url');
+    } else {
+      setImageMode('upload');
+    }
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setUploadFile(null);
+    setUploadPreview(null);
+  }
+
+  async function handleSubmitCar(e: FormEvent) {
     e.preventDefault();
     setFormLoading(true);
 
@@ -197,7 +257,8 @@ export default function AdminPanel() {
       const { data: urlData } = supabase.storage.from('car-images').getPublicUrl(path);
       imageUrl = urlData.publicUrl;
     }
-    const { error } = await supabase.from('car_listings').insert({
+
+    const payload = {
       make: form.make,
       model: form.model,
       year: Number(form.year),
@@ -209,17 +270,28 @@ export default function AdminPanel() {
       description: form.description || null,
       image_url: imageUrl,
       status: form.status,
-    });
-    if (error) {
-      setToast({ message: 'Failed to add car: ' + error.message, type: 'error' });
+    };
+
+    if (editingId) {
+      const { error } = await supabase.from('car_listings').update(payload).eq('id', editingId);
+      if (error) {
+        setToast({ message: 'Failed to update car: ' + error.message, type: 'error' });
+      } else {
+        setToast({ message: 'Car updated successfully!', type: 'success' });
+        closeForm();
+        fetchCars();
+      }
     } else {
-      setToast({ message: 'Car added successfully!', type: 'success' });
-      setForm(emptyForm);
-      setUploadFile(null);
-      setUploadPreview(null);
-      setShowForm(false);
-      fetchCars();
+      const { error } = await supabase.from('car_listings').insert(payload);
+      if (error) {
+        setToast({ message: 'Failed to add car: ' + error.message, type: 'error' });
+      } else {
+        setToast({ message: 'Car added successfully!', type: 'success' });
+        closeForm();
+        fetchCars();
+      }
     }
+
     setFormLoading(false);
   }
 
@@ -287,7 +359,7 @@ export default function AdminPanel() {
             <p className="text-slate-500 text-sm mt-0.5">{cars.length} listing{cars.length !== 1 ? 's' : ''}</p>
           </div>
           <button
-            onClick={() => { setShowForm(true); setForm(emptyForm); }}
+            onClick={openAdd}
             className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-md"
           >
             <Plus className="w-5 h-5" />
@@ -295,18 +367,20 @@ export default function AdminPanel() {
           </button>
         </div>
 
-        {/* Add Car Modal */}
+        {/* Add / Edit Car Modal */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
             <div className="bg-white rounded-2xl w-full max-w-2xl my-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-                <h3 className="text-lg font-bold text-slate-900">Add New Car</h3>
-                <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <h3 className="text-lg font-bold text-slate-900">
+                  {editingId ? 'Edit Car' : 'Add New Car'}
+                </h3>
+                <button onClick={closeForm} className="text-slate-400 hover:text-slate-600 transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleAddCar} className="p-6 space-y-5">
+              <form onSubmit={handleSubmitCar} className="p-6 space-y-5">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <Field label="Make *">
                     <input required value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} placeholder="e.g. Toyota" className={inputCls} />
@@ -430,12 +504,12 @@ export default function AdminPanel() {
                 </Field>
 
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => { setShowForm(false); setUploadFile(null); setUploadPreview(null); }} className="flex-1 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-colors">
+                  <button type="button" onClick={closeForm} className="flex-1 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-colors">
                     Cancel
                   </button>
                   <button type="submit" disabled={formLoading || uploading} className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold transition-colors flex items-center justify-center gap-2">
-                    {(formLoading || uploading) ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                    {uploading ? 'Uploading...' : formLoading ? 'Adding...' : 'Add Car'}
+                    {(formLoading || uploading) ? <Loader2 className="w-5 h-5 animate-spin" /> : editingId ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                    {uploading ? 'Uploading...' : formLoading ? (editingId ? 'Saving...' : 'Adding...') : editingId ? 'Save Changes' : 'Add Car'}
                   </button>
                 </div>
               </form>
@@ -499,14 +573,23 @@ export default function AdminPanel() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleDelete(car.id)}
-                          disabled={deletingId === car.id}
-                          className="text-slate-400 hover:text-red-500 disabled:opacity-40 transition-colors p-1.5 rounded-lg hover:bg-red-50"
-                          title="Delete listing"
-                        >
-                          {deletingId === car.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => openEdit(car)}
+                            className="text-slate-400 hover:text-blue-600 transition-colors p-1.5 rounded-lg hover:bg-blue-50"
+                            title="Edit listing"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(car.id)}
+                            disabled={deletingId === car.id}
+                            className="text-slate-400 hover:text-red-500 disabled:opacity-40 transition-colors p-1.5 rounded-lg hover:bg-red-50"
+                            title="Delete listing"
+                          >
+                            {deletingId === car.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
