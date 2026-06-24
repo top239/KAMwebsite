@@ -1,4 +1,4 @@
-import { Phone, Mail, MessageSquare } from 'lucide-react';
+import { Phone, Mail, MessageSquare, MapPin } from 'lucide-react';
 
 export default function Hero() {
   return (
@@ -23,6 +23,11 @@ export default function Hero() {
           <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto">
             Reliable engine diagnostics and repair for cars and light trucks
           </p>
+
+          <div className="flex items-center justify-center gap-2 mt-4 text-slate-400">
+            <MapPin className="w-4 h-4 text-orange-400 flex-shrink-0" />
+            <span className="text-sm md:text-base">4603 Bank St, Unit 6, Gloucester, ON K1T 3W6</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
