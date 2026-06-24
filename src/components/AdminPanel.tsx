@@ -1,8 +1,8 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import {
-  LogOut, Plus, Trash2, Car, Loader2, CheckCircle, AlertCircle, X, Eye, EyeOff
+  LogOut, Plus, Trash2, Car, Loader2, CheckCircle, AlertCircle, X, Eye, EyeOff, Upload, Link
 } from 'lucide-react';
 
 interface CarListing {
@@ -144,6 +144,11 @@ export default function AdminPanel() {
   const [formLoading, setFormLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [imageMode, setImageMode] = useState<'upload' | 'url'>('upload');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -173,6 +178,25 @@ export default function AdminPanel() {
   async function handleAddCar(e: FormEvent) {
     e.preventDefault();
     setFormLoading(true);
+
+    let imageUrl = form.image_url || null;
+
+    if (imageMode === 'upload' && uploadFile) {
+      setUploading(true);
+      const ext = uploadFile.name.split('.').pop();
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('car-images')
+        .upload(path, uploadFile, { upsert: false });
+      setUploading(false);
+      if (uploadError) {
+        setToast({ message: 'Image upload failed: ' + uploadError.message, type: 'error' });
+        setFormLoading(false);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from('car-images').getPublicUrl(path);
+      imageUrl = urlData.publicUrl;
+    }
     const { error } = await supabase.from('car_listings').insert({
       make: form.make,
       model: form.model,
@@ -183,7 +207,7 @@ export default function AdminPanel() {
       transmission: form.transmission,
       fuel_type: form.fuel_type,
       description: form.description || null,
-      image_url: form.image_url || null,
+      image_url: imageUrl,
       status: form.status,
     });
     if (error) {
@@ -191,6 +215,8 @@ export default function AdminPanel() {
     } else {
       setToast({ message: 'Car added successfully!', type: 'success' });
       setForm(emptyForm);
+      setUploadFile(null);
+      setUploadPreview(null);
       setShowForm(false);
       fetchCars();
     }
@@ -322,27 +348,94 @@ export default function AdminPanel() {
                   </Field>
                 </div>
 
-                <Field label="Image URL">
-                  <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." className={inputCls} />
-                </Field>
-
-                {form.image_url && (
-                  <div className="rounded-xl overflow-hidden h-40 bg-slate-100">
-                    <img src={form.image_url} alt="preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700">Photo</label>
+                    <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => { setImageMode('upload'); setUploadFile(null); setUploadPreview(null); }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${imageMode === 'upload' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        Upload
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setImageMode('url'); setUploadFile(null); setUploadPreview(null); }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${imageMode === 'url' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        <Link className="w-3.5 h-3.5" />
+                        URL
+                      </button>
+                    </div>
                   </div>
-                )}
+
+                  {imageMode === 'upload' ? (
+                    <div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setUploadFile(file);
+                          setUploadPreview(URL.createObjectURL(file));
+                        }}
+                      />
+                      {uploadPreview ? (
+                        <div className="relative rounded-xl overflow-hidden h-40 bg-slate-100">
+                          <img src={uploadPreview} alt="preview" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => { setUploadFile(null); setUploadPreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                            className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full border-2 border-dashed border-slate-300 hover:border-orange-400 rounded-xl p-8 flex flex-col items-center gap-2 text-slate-400 hover:text-orange-500 transition-all"
+                        >
+                          <Upload className="w-8 h-8" />
+                          <span className="text-sm font-medium">Click to upload a photo</span>
+                          <span className="text-xs">JPG, PNG, WEBP up to 10MB</span>
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        value={form.image_url}
+                        onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                        placeholder="https://..."
+                        className={inputCls}
+                      />
+                      {form.image_url && (
+                        <div className="rounded-xl overflow-hidden h-40 bg-slate-100 mt-2">
+                          <img src={form.image_url} alt="preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <Field label="Description">
                   <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Vehicle details, features, condition..." className={`${inputCls} resize-none`} />
                 </Field>
 
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-colors">
+                  <button type="button" onClick={() => { setShowForm(false); setUploadFile(null); setUploadPreview(null); }} className="flex-1 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-colors">
                     Cancel
                   </button>
-                  <button type="submit" disabled={formLoading} className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold transition-colors flex items-center justify-center gap-2">
-                    {formLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                    {formLoading ? 'Adding...' : 'Add Car'}
+                  <button type="submit" disabled={formLoading || uploading} className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold transition-colors flex items-center justify-center gap-2">
+                    {(formLoading || uploading) ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                    {uploading ? 'Uploading...' : formLoading ? 'Adding...' : 'Add Car'}
                   </button>
                 </div>
               </form>
