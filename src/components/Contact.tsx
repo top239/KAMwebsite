@@ -86,6 +86,10 @@ export default function Contact() {
                   4603 Bank St, Unit 6<br />
                   Gloucester, ON K1T 3W6
                 </p>
+                <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                  Professional Car & Truck Services in Ottawa<br />
+                  Reliable engine diagnostics and repair for cars and light trucks
+                </p>
               </div>
             </div>
           </div>
