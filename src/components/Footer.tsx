@@ -12,11 +12,10 @@ const FacebookIcon = () => (
   </svg>
 );
 
-// TODO: Replace these placeholder links with your actual Facebook Marketplace page URLs
 const FACEBOOK_PAGES = [
-  { label: 'Page 1', href: '#fb-page-1' },
-  { label: 'Page 2', href: '#fb-page-2' },
-  { label: 'Page 3', href: '#fb-page-3' },
+  { label: 'Page 1', href: 'https://www.facebook.com/marketplace/profile/100007091010687/' },
+  { label: 'Page 2', href: 'https://www.facebook.com/marketplace/profile/61589715587256/' },
+  { label: 'Page 3', href: 'https://www.facebook.com/marketplace/profile/100072085497257/' },
 ];
 
 export default function Footer() {
