@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Car, Fuel, Gauge, Palette, ChevronRight, Tag } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { Car, Fuel, Gauge, Palette, ChevronRight, Tag, Search, X, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface CarListing {
@@ -17,11 +17,26 @@ interface CarListing {
   status: 'available' | 'sold';
 }
 
+const PRICE_OPTIONS = [
+  { label: 'Any Price', value: 0 },
+  { label: 'Under $5,000', value: 5000 },
+  { label: 'Under $10,000', value: 10000 },
+  { label: 'Under $15,000', value: 15000 },
+  { label: 'Under $20,000', value: 20000 },
+  { label: 'Under $30,000', value: 30000 },
+];
+
 export default function CarListings() {
   const [cars, setCars] = useState<CarListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<CarListing | null>(null);
+
+  const [search, setSearch] = useState('');
+  const [maxPrice, setMaxPrice] = useState(0);
+  const [fuelType, setFuelType] = useState('');
+  const [transmission, setTransmission] = useState('');
+  const [availableOnly, setAvailableOnly] = useState(false);
 
   useEffect(() => {
     async function fetchCars() {
@@ -40,18 +55,115 @@ export default function CarListings() {
     fetchCars();
   }, []);
 
+  const fuelTypes = useMemo(() => [...new Set(cars.map(c => c.fuel_type))].sort(), [cars]);
+  const transmissions = useMemo(() => [...new Set(cars.map(c => c.transmission))].sort(), [cars]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return cars.filter(car => {
+      if (q && !`${car.year} ${car.make} ${car.model}`.toLowerCase().includes(q)) return false;
+      if (maxPrice > 0 && car.price > maxPrice) return false;
+      if (fuelType && car.fuel_type !== fuelType) return false;
+      if (transmission && car.transmission !== transmission) return false;
+      if (availableOnly && car.status !== 'available') return false;
+      return true;
+    });
+  }, [cars, search, maxPrice, fuelType, transmission, availableOnly]);
+
+  const hasFilters = search || maxPrice > 0 || fuelType || transmission || availableOnly;
+
+  function clearFilters() {
+    setSearch('');
+    setMaxPrice(0);
+    setFuelType('');
+    setTransmission('');
+    setAvailableOnly(false);
+  }
+
   return (
     <section id="cars" className="py-20 bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-            Cars for Sale
-          </h2>
+        <div className="text-center mb-12">
+          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">Cars for Sale</h2>
           <div className="w-24 h-1 bg-orange-500 mx-auto mb-6"></div>
-          <p className="text-xl text-slate-600">
-            Browse our selection of quality pre-owned vehicles
-          </p>
+          <p className="text-xl text-slate-600">Browse our selection of quality pre-owned vehicles</p>
         </div>
+
+        {!loading && !error && cars.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-8">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search by make, model, or year..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-sm text-slate-800 placeholder:text-slate-400"
+                />
+              </div>
+
+              <select
+                value={maxPrice}
+                onChange={e => setMaxPrice(Number(e.target.value))}
+                className="px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm text-slate-700 bg-white"
+              >
+                {PRICE_OPTIONS.map(opt => (
+                  <option key={opt.label} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+
+              {fuelTypes.length > 1 && (
+                <select
+                  value={fuelType}
+                  onChange={e => setFuelType(e.target.value)}
+                  className="px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm text-slate-700 bg-white"
+                >
+                  <option value="">All Fuel Types</option>
+                  {fuelTypes.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              )}
+
+              {transmissions.length > 1 && (
+                <select
+                  value={transmission}
+                  onChange={e => setTransmission(e.target.value)}
+                  className="px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm text-slate-700 bg-white"
+                >
+                  <option value="">All Transmissions</option>
+                  {transmissions.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={availableOnly}
+                  onChange={e => setAvailableOnly(e.target.checked)}
+                  className="w-4 h-4 accent-orange-500 rounded"
+                />
+                <span className="text-sm text-slate-600 font-medium">Available only</span>
+              </label>
+
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-500">
+                  {filtered.length} of {cars.length} vehicle{cars.length !== 1 ? 's' : ''}
+                </span>
+                {hasFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="flex items-center gap-1 text-sm text-orange-500 hover:text-orange-600 font-medium transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -68,9 +180,7 @@ export default function CarListings() {
           </div>
         )}
 
-        {error && (
-          <p className="text-center text-red-500">{error}</p>
-        )}
+        {error && <p className="text-center text-red-500">{error}</p>}
 
         {!loading && !error && cars.length === 0 && (
           <div className="text-center py-16">
@@ -79,9 +189,22 @@ export default function CarListings() {
           </div>
         )}
 
-        {!loading && !error && cars.length > 0 && (
+        {!loading && !error && cars.length > 0 && filtered.length === 0 && (
+          <div className="text-center py-16">
+            <SlidersHorizontal className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500 text-lg font-medium mb-2">No vehicles match your filters.</p>
+            <button
+              onClick={clearFilters}
+              className="text-orange-500 hover:text-orange-600 font-medium text-sm transition-colors"
+            >
+              Clear all filters
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && filtered.length > 0 && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {cars.map((car) => (
+            {filtered.map((car) => (
               <div
                 key={car.id}
                 className="group bg-white rounded-2xl overflow-hidden border border-slate-200 hover:border-orange-300 hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col"
@@ -190,7 +313,9 @@ export default function CarListings() {
                     ${selected.price.toLocaleString()}
                   </p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-sm font-semibold flex-shrink-0 ${selected.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold flex-shrink-0 ${
+                  selected.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                }`}>
                   {selected.status === 'available' ? 'Available' : 'Sold'}
                 </span>
               </div>

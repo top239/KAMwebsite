@@ -4,6 +4,7 @@ import Hero from './components/Hero';
 import About from './components/About';
 import Services from './components/Services';
 import CarListings from './components/CarListings';
+import Reviews from './components/Reviews';
 import Contact from './components/Contact';
 import Map from './components/Map';
 import Footer from './components/Footer';
@@ -30,6 +31,7 @@ function App() {
       <About />
       <Services />
       <CarListings />
+      <Reviews />
       <Contact />
       <Map />
       <Footer />
