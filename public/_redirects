@@ -1,3 +1,1 @@
-/* Bolt/Netlify SPA redirect */
-/*    /admin    /index.html   200
-/*              /index.html   200
+/* /index.html 200
