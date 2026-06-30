@@ -20,7 +20,7 @@ export default function Map() {
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
           <div className="aspect-[16/9] w-full bg-slate-200 relative">
             <iframe
-              src={`https://www.google.com/maps/embed/v1/place?key=&q=${encodedAddress}`}
+              src={`https://maps.google.com/maps?q=${encodedAddress}&output=embed&z=16`}
               width="100%"
               height="100%"
               style={{ border: 0 }}
@@ -30,7 +30,7 @@ export default function Map() {
               title="KAM Auto Shop Location"
               className="absolute inset-0"
             />
-            <div className="absolute inset-0 bg-slate-900/20 flex items-center justify-center">
+            <div className="absolute bottom-4 left-4 right-4 flex justify-center pointer-events-none">
               <div className="bg-white/95 backdrop-blur-sm px-6 py-4 rounded-lg shadow-lg">
                 <div className="flex items-center gap-3 mb-3">
                   <MapPin className="w-6 h-6 text-orange-500" />
