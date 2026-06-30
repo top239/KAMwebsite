@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import {
-  LogOut, Plus, Trash2, Car, Loader2, CheckCircle, AlertCircle, X, Eye, EyeOff, Upload, Link, Pencil
+  LogOut, Plus, Trash2, Car, Loader2, CheckCircle, AlertCircle, X, Eye, EyeOff, Upload, Link, Pencil, Star, MessageSquare
 } from 'lucide-react';
 
 interface CarListing {
@@ -18,6 +18,14 @@ interface CarListing {
   description: string | null;
   image_url: string | null;
   status: 'available' | 'sold';
+  created_at: string;
+}
+
+interface Review {
+  id: string;
+  reviewer_name: string;
+  rating: number;
+  comment: string;
   created_at: string;
 }
 
@@ -164,22 +172,41 @@ function LoginForm({ onLogin }: { onLogin: (user: User) => void }) {
   );
 }
 
+function StarDisplay({ rating }: { rating: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <Star key={s} className={`w-4 h-4 ${s <= rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200 fill-slate-200'}`} />
+      ))}
+    </div>
+  );
+}
+
 export default function AdminPanel() {
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [activeTab, setActiveTab] = useState<'cars' | 'reviews'>('cars');
+
+  // Cars state
   const [cars, setCars] = useState<CarListing[]>([]);
   const [carsLoading, setCarsLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(emptyForm);
   const [formLoading, setFormLoading] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [deletingCarId, setDeletingCarId] = useState<string | null>(null);
   const [imageMode, setImageMode] = useState<'upload' | 'url'>('upload');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reviews state
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -193,7 +220,10 @@ export default function AdminPanel() {
   }, []);
 
   useEffect(() => {
-    if (user) fetchCars();
+    if (user) {
+      fetchCars();
+      fetchReviews();
+    }
   }, [user]);
 
   async function fetchCars() {
@@ -204,6 +234,16 @@ export default function AdminPanel() {
       .order('created_at', { ascending: false });
     if (!error) setCars(data ?? []);
     setCarsLoading(false);
+  }
+
+  async function fetchReviews() {
+    setReviewsLoading(true);
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error) setReviews(data ?? []);
+    setReviewsLoading(false);
   }
 
   function openAdd() {
@@ -295,9 +335,9 @@ export default function AdminPanel() {
     setFormLoading(false);
   }
 
-  async function handleDelete(id: string) {
+  async function handleDeleteCar(id: string) {
     if (!confirm('Are you sure you want to delete this listing?')) return;
-    setDeletingId(id);
+    setDeletingCarId(id);
     const { error } = await supabase.from('car_listings').delete().eq('id', id);
     if (error) {
       setToast({ message: 'Failed to delete: ' + error.message, type: 'error' });
@@ -305,7 +345,20 @@ export default function AdminPanel() {
       setToast({ message: 'Listing deleted.', type: 'success' });
       setCars((prev) => prev.filter((c) => c.id !== id));
     }
-    setDeletingId(null);
+    setDeletingCarId(null);
+  }
+
+  async function handleDeleteReview(id: string) {
+    if (!confirm('Delete this review? This cannot be undone.')) return;
+    setDeletingReviewId(id);
+    const { error } = await supabase.from('reviews').delete().eq('id', id);
+    if (error) {
+      setToast({ message: 'Failed to delete review: ' + error.message, type: 'error' });
+    } else {
+      setToast({ message: 'Review deleted.', type: 'success' });
+      setReviews((prev) => prev.filter((r) => r.id !== id));
+    }
+    setDeletingReviewId(null);
   }
 
   async function handleLogout() {
@@ -328,7 +381,6 @@ export default function AdminPanel() {
     <div className="min-h-screen bg-slate-100">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -352,251 +404,359 @@ export default function AdminPanel() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page title + add button */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">Car Listings</h2>
-            <p className="text-slate-500 text-sm mt-0.5">{cars.length} listing{cars.length !== 1 ? 's' : ''}</p>
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1 w-fit mb-8 shadow-sm">
           <button
-            onClick={openAdd}
-            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-md"
+            onClick={() => setActiveTab('cars')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'cars'
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
           >
-            <Plus className="w-5 h-5" />
-            <span>Add Car</span>
+            <Car className="w-4 h-4" />
+            Car Listings
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${activeTab === 'cars' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+              {cars.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('reviews')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'reviews'
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            Reviews
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${activeTab === 'reviews' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+              {reviews.length}
+            </span>
           </button>
         </div>
 
-        {/* Add / Edit Car Modal */}
-        {showForm && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="bg-white rounded-2xl w-full max-w-2xl my-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-                <h3 className="text-lg font-bold text-slate-900">
-                  {editingId ? 'Edit Car' : 'Add New Car'}
-                </h3>
-                <button onClick={closeForm} className="text-slate-400 hover:text-slate-600 transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
+        {/* ── Cars Tab ── */}
+        {activeTab === 'cars' && (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">Car Listings</h2>
+                <p className="text-slate-500 text-sm mt-0.5">{cars.length} listing{cars.length !== 1 ? 's' : ''}</p>
               </div>
+              <button
+                onClick={openAdd}
+                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-md"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Add Car</span>
+              </button>
+            </div>
 
-              <form onSubmit={handleSubmitCar} className="p-6 space-y-5">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <Field label="Make *">
-                    <input required value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} placeholder="e.g. Toyota" className={inputCls} />
-                  </Field>
-                  <Field label="Model *">
-                    <input required value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="e.g. Camry" className={inputCls} />
-                  </Field>
-                  <Field label="Year *">
-                    <input required type="number" min={1980} max={2030} value={form.year} onChange={(e) => setForm({ ...form, year: Number(e.target.value) })} className={inputCls} />
-                  </Field>
-                  <Field label="Price ($) *">
-                    <input required type="number" min={0} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="e.g. 15000" className={inputCls} />
-                  </Field>
-                  <Field label="Mileage (km) *">
-                    <input required type="number" min={0} value={form.mileage} onChange={(e) => setForm({ ...form, mileage: e.target.value })} placeholder="e.g. 60000" className={inputCls} />
-                  </Field>
-                  <Field label="Color *">
-                    <input required value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} placeholder="e.g. Silver" className={inputCls} />
-                  </Field>
-                  <Field label="Transmission *">
-                    <select value={form.transmission} onChange={(e) => setForm({ ...form, transmission: e.target.value })} className={inputCls}>
-                      <option>Automatic</option>
-                      <option>Manual</option>
-                    </select>
-                  </Field>
-                  <Field label="Fuel Type *">
-                    <select value={form.fuel_type} onChange={(e) => setForm({ ...form, fuel_type: e.target.value })} className={inputCls}>
-                      <option>Gasoline</option>
-                      <option>Diesel</option>
-                      <option>Electric</option>
-                      <option>Hybrid</option>
-                    </select>
-                  </Field>
-                  <Field label="Status">
-                    <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as 'available' | 'sold' })} className={inputCls}>
-                      <option value="available">Available</option>
-                      <option value="sold">Sold</option>
-                    </select>
-                  </Field>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-sm font-medium text-slate-700">Photo</label>
-                    <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => { setImageMode('upload'); setUploadFile(null); setUploadPreview(null); }}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${imageMode === 'upload' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        Upload
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setImageMode('url'); setUploadFile(null); setUploadPreview(null); }}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${imageMode === 'url' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        <Link className="w-3.5 h-3.5" />
-                        URL
-                      </button>
-                    </div>
+            {showForm && (
+              <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+                <div className="bg-white rounded-2xl w-full max-w-2xl my-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                    <h3 className="text-lg font-bold text-slate-900">
+                      {editingId ? 'Edit Car' : 'Add New Car'}
+                    </h3>
+                    <button onClick={closeForm} className="text-slate-400 hover:text-slate-600 transition-colors">
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
 
-                  {imageMode === 'upload' ? (
+                  <form onSubmit={handleSubmitCar} className="p-6 space-y-5">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <Field label="Make *">
+                        <input required value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} placeholder="e.g. Toyota" className={inputCls} />
+                      </Field>
+                      <Field label="Model *">
+                        <input required value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="e.g. Camry" className={inputCls} />
+                      </Field>
+                      <Field label="Year *">
+                        <input required type="number" min={1980} max={2030} value={form.year} onChange={(e) => setForm({ ...form, year: Number(e.target.value) })} className={inputCls} />
+                      </Field>
+                      <Field label="Price ($) *">
+                        <input required type="number" min={0} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="e.g. 15000" className={inputCls} />
+                      </Field>
+                      <Field label="Mileage (km) *">
+                        <input required type="number" min={0} value={form.mileage} onChange={(e) => setForm({ ...form, mileage: e.target.value })} placeholder="e.g. 60000" className={inputCls} />
+                      </Field>
+                      <Field label="Color *">
+                        <input required value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} placeholder="e.g. Silver" className={inputCls} />
+                      </Field>
+                      <Field label="Transmission *">
+                        <select value={form.transmission} onChange={(e) => setForm({ ...form, transmission: e.target.value })} className={inputCls}>
+                          <option>Automatic</option>
+                          <option>Manual</option>
+                        </select>
+                      </Field>
+                      <Field label="Fuel Type *">
+                        <select value={form.fuel_type} onChange={(e) => setForm({ ...form, fuel_type: e.target.value })} className={inputCls}>
+                          <option>Gasoline</option>
+                          <option>Diesel</option>
+                          <option>Electric</option>
+                          <option>Hybrid</option>
+                        </select>
+                      </Field>
+                      <Field label="Status">
+                        <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as 'available' | 'sold' })} className={inputCls}>
+                          <option value="available">Available</option>
+                          <option value="sold">Sold</option>
+                        </select>
+                      </Field>
+                    </div>
+
                     <div>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          setUploadFile(file);
-                          setUploadPreview(URL.createObjectURL(file));
-                        }}
-                      />
-                      {uploadPreview ? (
-                        <div className="relative rounded-xl overflow-hidden h-40 bg-slate-100">
-                          <img src={uploadPreview} alt="preview" className="w-full h-full object-cover" />
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-sm font-medium text-slate-700">Photo</label>
+                        <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
                           <button
                             type="button"
-                            onClick={() => { setUploadFile(null); setUploadPreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                            className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
+                            onClick={() => { setImageMode('upload'); setUploadFile(null); setUploadPreview(null); }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${imageMode === 'upload' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                           >
-                            <X className="w-4 h-4" />
+                            <Upload className="w-3.5 h-3.5" />
+                            Upload
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => { setImageMode('url'); setUploadFile(null); setUploadPreview(null); }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${imageMode === 'url' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                          >
+                            <Link className="w-3.5 h-3.5" />
+                            URL
+                          </button>
+                        </div>
+                      </div>
+
+                      {imageMode === 'upload' ? (
+                        <div>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setUploadFile(file);
+                              setUploadPreview(URL.createObjectURL(file));
+                            }}
+                          />
+                          {uploadPreview ? (
+                            <div className="relative rounded-xl overflow-hidden h-40 bg-slate-100">
+                              <img src={uploadPreview} alt="preview" className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => { setUploadFile(null); setUploadPreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                                className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="w-full border-2 border-dashed border-slate-300 hover:border-orange-400 rounded-xl p-8 flex flex-col items-center gap-2 text-slate-400 hover:text-orange-500 transition-all"
+                            >
+                              <Upload className="w-8 h-8" />
+                              <span className="text-sm font-medium">Click to upload a photo</span>
+                              <span className="text-xs">JPG, PNG, WEBP up to 10MB</span>
+                            </button>
+                          )}
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="w-full border-2 border-dashed border-slate-300 hover:border-orange-400 rounded-xl p-8 flex flex-col items-center gap-2 text-slate-400 hover:text-orange-500 transition-all"
-                        >
-                          <Upload className="w-8 h-8" />
-                          <span className="text-sm font-medium">Click to upload a photo</span>
-                          <span className="text-xs">JPG, PNG, WEBP up to 10MB</span>
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <input
-                        value={form.image_url}
-                        onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                        placeholder="https://..."
-                        className={inputCls}
-                      />
-                      {form.image_url && (
-                        <div className="rounded-xl overflow-hidden h-40 bg-slate-100 mt-2">
-                          <img src={form.image_url} alt="preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        <div>
+                          <input
+                            value={form.image_url}
+                            onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                            placeholder="https://..."
+                            className={inputCls}
+                          />
+                          {form.image_url && (
+                            <div className="rounded-xl overflow-hidden h-40 bg-slate-100 mt-2">
+                              <img src={form.image_url} alt="preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
 
-                <Field label="Description">
-                  <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Vehicle details, features, condition..." className={`${inputCls} resize-none`} />
-                </Field>
+                    <Field label="Description">
+                      <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Vehicle details, features, condition..." className={`${inputCls} resize-none`} />
+                    </Field>
 
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={closeForm} className="flex-1 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-colors">
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={formLoading || uploading} className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold transition-colors flex items-center justify-center gap-2">
-                    {(formLoading || uploading) ? <Loader2 className="w-5 h-5 animate-spin" /> : editingId ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                    {uploading ? 'Uploading...' : formLoading ? (editingId ? 'Saving...' : 'Adding...') : editingId ? 'Save Changes' : 'Add Car'}
-                  </button>
+                    <div className="flex gap-3 pt-2">
+                      <button type="button" onClick={closeForm} className="flex-1 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-colors">
+                        Cancel
+                      </button>
+                      <button type="submit" disabled={formLoading || uploading} className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold transition-colors flex items-center justify-center gap-2">
+                        {(formLoading || uploading) ? <Loader2 className="w-5 h-5 animate-spin" /> : editingId ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                        {uploading ? 'Uploading...' : formLoading ? (editingId ? 'Saving...' : 'Adding...') : editingId ? 'Save Changes' : 'Add Car'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              </form>
-            </div>
-          </div>
+              </div>
+            )}
+
+            {carsLoading ? (
+              <div className="flex items-center justify-center py-24">
+                <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+              </div>
+            ) : cars.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center">
+                <Car className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                <p className="text-slate-500 font-medium">No listings yet. Add your first car above.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Photo</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Vehicle</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Price</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Mileage</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Details</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
+                        <th className="px-4 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {cars.map((car) => (
+                        <tr key={car.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3">
+                            {car.image_url ? (
+                              <img src={car.image_url} alt="" className="w-16 h-11 object-cover rounded-lg bg-slate-100" />
+                            ) : (
+                              <div className="w-16 h-11 rounded-lg bg-slate-100 flex items-center justify-center">
+                                <Car className="w-5 h-5 text-slate-300" />
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-slate-900">{car.year} {car.make} {car.model}</p>
+                            <p className="text-slate-400 text-xs mt-0.5">{car.color}</p>
+                          </td>
+                          <td className="px-4 py-3 font-bold text-orange-500">
+                            ${car.price.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 hidden md:table-cell">
+                            {car.mileage.toLocaleString()} km
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 hidden lg:table-cell">
+                            {car.transmission} · {car.fuel_type}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${car.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                              {car.status === 'available' ? 'Available' : 'Sold'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => openEdit(car)}
+                                className="text-slate-400 hover:text-blue-600 transition-colors p-1.5 rounded-lg hover:bg-blue-50"
+                                title="Edit listing"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCar(car.id)}
+                                disabled={deletingCarId === car.id}
+                                className="text-slate-400 hover:text-red-500 disabled:opacity-40 transition-colors p-1.5 rounded-lg hover:bg-red-50"
+                                title="Delete listing"
+                              >
+                                {deletingCarId === car.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
-        {/* Cars table */}
-        {carsLoading ? (
-          <div className="flex items-center justify-center py-24">
-            <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-          </div>
-        ) : cars.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center">
-            <Car className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-            <p className="text-slate-500 font-medium">No listings yet. Add your first car above.</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Photo</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Vehicle</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Price</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Mileage</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Details</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
-                    <th className="px-4 py-3"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {cars.map((car) => (
-                    <tr key={car.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">
-                        {car.image_url ? (
-                          <img src={car.image_url} alt="" className="w-16 h-11 object-cover rounded-lg bg-slate-100" />
-                        ) : (
-                          <div className="w-16 h-11 rounded-lg bg-slate-100 flex items-center justify-center">
-                            <Car className="w-5 h-5 text-slate-300" />
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-900">{car.year} {car.make} {car.model}</p>
-                        <p className="text-slate-400 text-xs mt-0.5">{car.color}</p>
-                      </td>
-                      <td className="px-4 py-3 font-bold text-orange-500">
-                        ${car.price.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 hidden md:table-cell">
-                        {car.mileage.toLocaleString()} km
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 hidden lg:table-cell">
-                        {car.transmission} · {car.fuel_type}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${car.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                          {car.status === 'available' ? 'Available' : 'Sold'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => openEdit(car)}
-                            className="text-slate-400 hover:text-blue-600 transition-colors p-1.5 rounded-lg hover:bg-blue-50"
-                            title="Edit listing"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(car.id)}
-                            disabled={deletingId === car.id}
-                            className="text-slate-400 hover:text-red-500 disabled:opacity-40 transition-colors p-1.5 rounded-lg hover:bg-red-50"
-                            title="Delete listing"
-                          >
-                            {deletingId === car.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {/* ── Reviews Tab ── */}
+        {activeTab === 'reviews' && (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">Customer Reviews</h2>
+                <p className="text-slate-500 text-sm mt-0.5">{reviews.length} review{reviews.length !== 1 ? 's' : ''}</p>
+              </div>
             </div>
-          </div>
+
+            {reviewsLoading ? (
+              <div className="flex items-center justify-center py-24">
+                <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+              </div>
+            ) : reviews.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center">
+                <MessageSquare className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                <p className="text-slate-500 font-medium">No reviews yet.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Reviewer</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Rating</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Comment</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Date</th>
+                        <th className="px-4 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {reviews.map((review) => (
+                        <tr key={review.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                <span className="text-orange-600 font-bold text-sm">
+                                  {review.reviewer_name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <span className="font-semibold text-slate-900 whitespace-nowrap">{review.reviewer_name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <StarDisplay rating={review.rating} />
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 max-w-xs">
+                            <p className="truncate">{review.comment}</p>
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 whitespace-nowrap hidden md:table-cell">
+                            {new Date(review.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => handleDeleteReview(review.id)}
+                              disabled={deletingReviewId === review.id}
+                              className="text-slate-400 hover:text-red-500 disabled:opacity-40 transition-colors p-1.5 rounded-lg hover:bg-red-50"
+                              title="Delete review"
+                            >
+                              {deletingReviewId === review.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>

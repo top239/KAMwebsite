@@ -56,10 +56,12 @@ export default function About() {
           </div>
 
           <div className="relative">
-            <div className="aspect-square bg-gradient-to-br from-slate-200 to-slate-300 rounded-2xl overflow-hidden shadow-2xl">
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
-                <Wrench className="w-32 h-32 text-orange-500 opacity-20" />
-              </div>
+            <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl">
+              <img
+                src="https://images.pexels.com/photos/3807386/pexels-photo-3807386.jpeg?auto=compress&cs=tinysrgb&w=800"
+                alt="Mechanic working on a vehicle at KAM Auto Shop"
+                className="w-full h-full object-cover"
+              />
             </div>
             <div className="absolute -bottom-6 -right-6 w-48 h-48 bg-orange-500 rounded-2xl -z-10"></div>
             <div className="absolute -top-6 -left-6 w-48 h-48 bg-blue-600 rounded-2xl -z-10"></div>
