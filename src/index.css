@@ -11,3 +11,81 @@
     @apply text-slate-900 antialiased;
   }
 }
+
+@keyframes shimmer-text {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes fade-up {
+  0% { opacity: 0; transform: translateY(28px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { text-shadow: 0 0 20px rgba(249,115,22,0.3), 0 0 40px rgba(249,115,22,0.1); }
+  50% { text-shadow: 0 0 40px rgba(249,115,22,0.6), 0 0 80px rgba(249,115,22,0.2); }
+}
+
+.hero-title {
+  background: linear-gradient(
+    90deg,
+    #ffffff 0%,
+    #ffffff 30%,
+    #f97316 45%,
+    #fb923c 50%,
+    #f97316 55%,
+    #ffffff 70%,
+    #ffffff 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-text 4s linear infinite, glow-pulse 3s ease-in-out infinite;
+}
+
+.hero-badge {
+  animation: fade-up 0.6s ease-out both;
+  animation-delay: 0.1s;
+}
+
+.hero-title-wrap {
+  animation: fade-up 0.7s ease-out both;
+  animation-delay: 0.25s;
+}
+
+.hero-subtitle {
+  animation: fade-up 0.7s ease-out both;
+  animation-delay: 0.4s;
+}
+
+.hero-subtext {
+  animation: fade-up 0.7s ease-out both;
+  animation-delay: 0.5s;
+}
+
+.hero-address {
+  animation: fade-up 0.7s ease-out both;
+  animation-delay: 0.6s;
+}
+
+.hero-cards {
+  animation: fade-up 0.8s ease-out both;
+  animation-delay: 0.75s;
+}
+
+.hero-fb {
+  animation: fade-up 0.8s ease-out both;
+  animation-delay: 0.9s;
+}
+
+.hero-bottom {
+  animation: fade-up 0.8s ease-out both;
+  animation-delay: 1.05s;
+}

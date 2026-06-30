@@ -25,30 +25,32 @@ export default function Hero() {
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-3 mb-6 px-4 py-2 bg-orange-500/10 border border-orange-500/20 rounded-full">
+          <div className="hero-badge inline-flex items-center gap-3 mb-6 px-4 py-2 bg-orange-500/10 border border-orange-500/20 rounded-full">
             <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
             <span className="text-orange-400 text-sm font-medium">Professional Automotive Service</span>
           </div>
 
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-            KAM Auto Shop
-          </h1>
+          <div className="hero-title-wrap">
+            <h1 className="hero-title text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
+              KAM Auto Shop
+            </h1>
+          </div>
 
-          <p className="text-xl md:text-2xl text-slate-300 mb-3 font-medium">
+          <p className="hero-subtitle text-xl md:text-2xl text-slate-300 mb-3 font-medium">
             Professional Car & Truck Services in Ottawa
           </p>
 
-          <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto">
+          <p className="hero-subtext text-lg md:text-xl text-slate-400 max-w-2xl mx-auto">
             Reliable engine diagnostics and repair for cars and light trucks
           </p>
 
-          <div className="flex items-center justify-center gap-2 mt-4 text-slate-400">
+          <div className="hero-address flex items-center justify-center gap-2 mt-4 text-slate-400">
             <MapPin className="w-4 h-4 text-orange-400 flex-shrink-0" />
             <span className="text-sm md:text-base">4603 Bank St, Unit 6, Gloucester, ON K1T 3W6</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        <div className="hero-cards grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300">
             <h3 className="text-lg font-semibold mb-4 text-orange-400">Contact Karim</h3>
             <div className="space-y-3">
@@ -100,7 +102,7 @@ export default function Hero() {
         </div>
 
         {/* Facebook Marketplace pages */}
-        <div className="mt-6 max-w-4xl mx-auto">
+        <div className="hero-fb mt-6 max-w-4xl mx-auto">
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
             <h3 className="text-lg font-semibold mb-4 text-[#1877F2] flex items-center gap-2">
               <FacebookIcon />
@@ -123,7 +125,7 @@ export default function Hero() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col items-center gap-4">
+        <div className="hero-bottom mt-6 flex flex-col items-center gap-4">
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <a
               href="mailto:KAMAUTOSALES99@GMAIL.COM"
