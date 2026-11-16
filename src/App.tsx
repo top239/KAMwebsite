@@ -4,6 +4,7 @@ import Hero from './components/Hero';
 import About from './components/About';
 import Services from './components/Services';
 import CarListings from './components/CarListings';
+import Marketplace from './components/Marketplace';
 import Reviews from './components/Reviews';
 import Contact from './components/Contact';
 import Map from './components/Map';
@@ -54,6 +55,7 @@ function App() {
       <About />
       <Services />
       <CarListings />
+      <Marketplace />
       <Reviews />
       <Contact />
       <Map />
